@@ -226,7 +226,7 @@ def save_colored_raster_as_png(src_memfile: MemoryFile,
         imageio.imsave(out_path, img_rgba)
         
         # Return the center/bounds for folium
-        return center, bounds_for_folium
+        return center, bounds_for_folium, mercator_bbox
 
 # Function to reclassify -> colorfy -> reproject -> toPNG
 def process_raster(initial_tif:str=None, 
@@ -266,8 +266,19 @@ def process_raster(initial_tif:str=None,
     memfile_colored = convert_1band_to_4band_in_memory(memfile_reclassified, color_dict, binary_color, binary_dict)
     memfile_reprojected = reproject_raster_in_memory(memfile_colored)
     
+    # Save the reprojected raster as a GeoTIFF file
+    with memfile_reprojected.open() as src:
+        kwargs = src.meta.copy()
+        kwargs.update(compress='lzw', dtype='uint8', nodata=0)
+        with rasterio.open(f"{final_path}_mercator.tif", 'w', **kwargs) as dst:
+            for i in range(1, src.count + 1):
+                dst.write(src.read(i), i)
+    
     # Save the reprojected raster as a PNG file
-    center, bounds = save_colored_raster_as_png(memfile_reprojected, final_path, src_crs, dst_crs)
+    center, bounds_for_folium, mercator_bbox = save_colored_raster_as_png(memfile_reprojected, 
+                                                                          f"{final_path}_mercator.png", 
+                                                                          src_crs, 
+                                                                          dst_crs)
     
     # Return the center and bounds for folium
-    return center, bounds
+    return center, bounds_for_folium, mercator_bbox
