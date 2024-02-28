@@ -1,14 +1,28 @@
-import os
 import pandas as pd
 import numpy as np
+import imageio
 
 import rasterio
-from rasterio.warp import calculate_default_transform, reproject, Resampling
 from rasterio.io import MemoryFile
+from rasterio.coords import BoundingBox
+from rasterio.warp import (calculate_default_transform, 
+                           transform_bounds, 
+                           reproject, 
+                           Resampling)
+
 
 
 # function to write colormap to tif
-def hex_color_to_numeric(hex_color):
+def hex_color_to_numeric(hex_color: str):
+    """
+    Converts a hexadecimal color code to its numeric representation.
+
+    Args:
+        hex_color (str): The hexadecimal color code to convert.
+
+    Returns:
+        tuple: A tuple containing the red, green, blue, and (optional) alpha components of the color.
+    """
     # Remove the '#' character (if present)
     hex_color = hex_color.lstrip('#')
 
@@ -25,10 +39,23 @@ def hex_color_to_numeric(hex_color):
     
     
 # function to convert hex color to numeric
-def color_hex2num(csv_path='Assests/lumap_colors.csv',
+def color_hex2num(csv_path:str='Assests/lumap_colors.csv',
                   color_code:str = None, 
                   color_hex:str = None):
+    """
+    Converts color codes from hexadecimal to numeric format.
     
+    Args:
+        csv_path (str): 
+                The path to the CSV file containing color codes and their corresponding numeric values.
+        color_code (str): 
+                The column name in the CSV file representing the color code.
+        color_hex (str): 
+                The column name in the CSV file representing the color code in hexadecimal format.
+        
+    Returns:
+        dict: A dictionary mapping color codes to their corresponding numeric values.
+    """
     lu_colors = pd.read_csv(csv_path)
     lu_colors['color_num'] = lu_colors[color_hex].apply(lambda x: hex_color_to_numeric(x))
     lu_colors_dict = lu_colors.set_index(color_code)['color_num'].to_dict()  
@@ -152,14 +179,65 @@ def reproject_raster_in_memory(src_memfile):
     return memfile
 
 
-# Function to reclassify -> colorfy -> reproject a raster
+def save_colored_raster_as_png(src_memfile: MemoryFile, 
+                               out_path: str, 
+                               src_crs: str = 'EPSG:3857', 
+                               dst_crs: str = 'EPSG:4326') -> None:
+    """
+    Save a colored raster image as a PNG file.
+
+    Args:
+        src_memfile (MemoryFile):
+            The source raster in a MemoryFile.
+        out_path (str): 
+            The path to save the PNG file.
+        src_crs (str, optional): 
+            The source coordinate reference system (CRS) of the raster image. 
+            Defaults to 'EPSG:3857'.
+        dst_crs (str, optional): 
+            The destination CRS for transforming the bounding box. 
+            Defaults to 'EPSG:4326'.
+
+    Returns:
+        Tuple[List[float], List[List[float]]]:
+            A tuple containing the center coordinates and bounds of the transformed bounding box.
+            The center coordinates are in the format [latitude, longitude].
+            The bounds are a list of lists, where each inner list represents a point in the format [latitude, longitude].
+    """
+    with src_memfile.open() as src:
+        bounds = src.bounds
+        img = src.read()  # CHW
+        img_rgba = img.transpose(1, 2, 0)  # CHW -> HWC
+
+        # Define your Mercator bounding box (left, bottom, right, top)
+        mercator_bbox = bounds
+
+        # Transform the bounding box to WGS84
+        wgs84_bbox = transform_bounds(src_crs, dst_crs, *mercator_bbox)
+        wgs84_bbox = BoundingBox(*wgs84_bbox)
+        bounds_for_folium = [[wgs84_bbox.bottom, wgs84_bbox.left],
+                             [wgs84_bbox.top, wgs84_bbox.right]]
+
+        # Get the center of the bounding box
+        center = [(wgs84_bbox.bottom + wgs84_bbox.top) / 2,
+                  (wgs84_bbox.left + wgs84_bbox.right) / 2]
+
+        # Save the image to a file
+        imageio.imsave(out_path, img_rgba)
+        
+        # Return the center/bounds for folium
+        return center, bounds_for_folium
+
+# Function to reclassify -> colorfy -> reproject -> toPNG
 def process_raster(initial_tif:str=None, 
                    band=1, 
                    reclass_dict:dict=None, 
                    color_dict:dict=None,
                    binary_color:bool=False,
                    binary_dict:dict=None, 
-                   final_path:str=None):
+                   final_path:str=None,
+                   src_crs='EPSG:3857', 
+                   dst_crs='EPSG:4326'):
     """
     Process a raster file by reclassifying, coloring, and reprojecting it entirely in memory.
     
@@ -178,16 +256,18 @@ def process_raster(initial_tif:str=None,
             Dictionary mapping pixel values to binary values for binary color mapping (default is None).
         final_path (str): 
             Path to save the final processed raster file (default is None).
+        src_crs (str):
+            Source coordinate reference system (default is 'EPSG:3857').
+        dst_crs (str):
+            Destination coordinate reference system (default is 'EPSG:4326').
     """
     # Process the raster entirely in memory
     memfile_reclassified = reclassify_raster_in_memory(initial_tif, reclass_dict, band)
     memfile_colored = convert_1band_to_4band_in_memory(memfile_reclassified, color_dict, binary_color, binary_dict)
     memfile_reprojected = reproject_raster_in_memory(memfile_colored)
-
-    # Optionally, save the final in-memory raster to disk
-    with memfile_reprojected.open() as final_src:
-        # Update the meta with compression and data type
-        meta = final_src.meta.copy()
-        meta.update(compress='lzw', dtype='uint8')
-        with rasterio.open(final_path, 'w', **meta) as final_dst:
-            final_dst.write(final_src.read())
+    
+    # Save the reprojected raster as a PNG file
+    center, bounds = save_colored_raster_as_png(memfile_reprojected, final_path, src_crs, dst_crs)
+    
+    # Return the center and bounds for folium
+    return center, bounds
