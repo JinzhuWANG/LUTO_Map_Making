@@ -1,3 +1,4 @@
+import os
 import rasterio
 from rasterio.plot import show
 from rasterio.merge import merge
@@ -109,3 +110,6 @@ def create_png_map(tif_path: str,
     ax.set_axis_off()
     plt.savefig(save_path, dpi=300, bbox_inches='tight', pad_inches=0)
     plt.close(fig)
+    
+    # Delete the input raster
+    os.remove(tif_path)
