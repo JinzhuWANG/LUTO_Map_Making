@@ -1,4 +1,4 @@
-lu_code,lu_desc,color_HEX,group_code,group_desc,group_color_HEX
+lu_code,lu_desc,lu_color_HEX,group_code,group_desc,group_color_HEX
 -1,Non-agricultural land,#666b65,-1,Non-Agricultural Land,#e1e1e1
 -2,"Water Bodies, cites etc.",#ffffff,-1,Non-Agricultural Land,#e1e1e1
 0,Apples,#a63634,1,Crop,#7a8ef5

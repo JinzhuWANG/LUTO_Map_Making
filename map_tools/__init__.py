@@ -13,7 +13,7 @@ from rasterio.warp import (calculate_default_transform,
 
 
 # function to write colormap to tif
-def hex_color_to_numeric(hex_color: str):
+def hex_color_to_numeric(hex_color: str, toFloat: bool = False) -> tuple:
     """
     Converts a hexadecimal color code to its numeric representation.
 
@@ -30,36 +30,27 @@ def hex_color_to_numeric(hex_color: str):
     red = int(hex_color[0:2], 16)
     green = int(hex_color[2:4], 16)
     blue = int(hex_color[4:6], 16)
-
+    
+    # Add 1 if any of the value equals 0
+    if red == 0:
+        red += 1
+    if green == 0:
+        green += 1
+    if blue == 0:
+        blue += 1
+    
+    # If the color includes an alpha channel
     if len(hex_color) == 8:  # If the color includes an alpha channel
-        alpha = int(hex_color[6:8], 16) 
-        return red, green, blue, alpha
+        alpha = int(hex_color[6:8], 16)
     else:
-        return red, green, blue, 255
+        alpha = 255
     
+    # Convert to float if toFloat is True
+    if toFloat:
+        red, green, blue, alpha = red/255, green/255, blue/255, alpha/255
+ 
+    return red, green, blue, alpha
     
-# function to convert hex color to numeric
-def color_hex2num(csv_path:str='Assests/lumap_colors.csv',
-                  color_code:str = None, 
-                  color_hex:str = None):
-    """
-    Converts color codes from hexadecimal to numeric format.
-    
-    Args:
-        csv_path (str): 
-                The path to the CSV file containing color codes and their corresponding numeric values.
-        color_code (str): 
-                The column name in the CSV file representing the color code.
-        color_hex (str): 
-                The column name in the CSV file representing the color code in hexadecimal format.
-        
-    Returns:
-        dict: A dictionary mapping color codes to their corresponding numeric values.
-    """
-    lu_colors = pd.read_csv(csv_path)
-    lu_colors['color_num'] = lu_colors[color_hex].apply(lambda x: hex_color_to_numeric(x))
-    lu_colors_dict = lu_colors.set_index(color_code)['color_num'].to_dict()  
-    return lu_colors_dict
 
 
 
@@ -269,7 +260,7 @@ def process_raster(initial_tif:str=None,
     # Save the reprojected raster as a GeoTIFF file
     with memfile_reprojected.open() as src:
         kwargs = src.meta.copy()
-        kwargs.update(compress='lzw', dtype='uint8', nodata=0)
+        kwargs.update(compress='lzw', dtype='uint8', nodata=None)
         with rasterio.open(f"{final_path}_mercator.tif", 'w', **kwargs) as dst:
             for i in range(1, src.count + 1):
                 dst.write(src.read(i), i)
