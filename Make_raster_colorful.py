@@ -1,8 +1,13 @@
 import pandas as pd
 import folium
+import rasterio
 from rasterio.merge import merge
 
-from map_tools import hex_color_to_numeric, process_raster
+from map_tools import (get_color_dict, 
+                       hex_color_to_numeric, 
+                       process_float_raster, 
+                       process_int_raster)
+
 from map_tools.map_making import create_png_map
 
 
@@ -33,7 +38,7 @@ out_base = 'Rasters\lumap_2050_2024_02_14__13_34_11'
 # center -> the center of the raster, can be used for folium map
 # bounds_wgs -> the bounds of the raster in WGS84, can be used for folium map
 # bounds_mercator -> the bounds of the raster in Mercator, can be to download the basemap
-center,  bounds_wgs, bounds_mercator = process_raster(initial_tif=init_tif,
+center,  bounds_wgs, bounds_mercator = process_int_raster(initial_tif=init_tif,
                                 reclass_dict=reclassify_dict,
                                 color_dict=val_color_dict,
                                 final_path=out_base)
@@ -56,11 +61,22 @@ create_png_map(tif_path = in_map_path,
                 save_path = png_out_path)
 
 
+###################################################################
+#       Merge processed map with basemap, create png map          #
+###################################################################
+tif_path = 'Rasters/Non-Ag_LU_00_Environmental Plantings_2050.tiff'
+NLUM_mask = 'Assests/NLUM_2010-11_mask.tif'
+save_base = 'Rasters/Non-Ag_LU_00_Environmental Plantings_2050'
+var_colors_dict = get_color_dict(color_scheme ='YlOrRd')
 
+center, bounds_for_folium, mercator_bbox = process_float_raster(
+                    initial_tif=tif_path,
+                     band=1, 
+                     color_dict=var_colors_dict,
+                     mask_path=NLUM_mask,
+                     final_path=save_base)
 
-
-
-
+    
 
 
 

@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib_scalebar.scalebar import ScaleBar
 
-import matplotlib.patches as mpatches
 
 
 

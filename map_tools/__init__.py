@@ -1,6 +1,6 @@
-import pandas as pd
 import numpy as np
 import imageio
+import matplotlib as mpl
 
 import rasterio
 from rasterio.io import MemoryFile
@@ -173,7 +173,7 @@ def reproject_raster_in_memory(src_memfile):
 def save_colored_raster_as_png(src_memfile: MemoryFile, 
                                out_path: str, 
                                src_crs: str = 'EPSG:3857', 
-                               dst_crs: str = 'EPSG:4326') -> None:
+                               dst_crs: str = 'EPSG:4326'):
     """
     Save a colored raster image as a PNG file.
 
@@ -216,11 +216,11 @@ def save_colored_raster_as_png(src_memfile: MemoryFile,
         # Save the image to a file
         imageio.imsave(out_path, img_rgba)
         
-        # Return the center/bounds for folium
-        return center, bounds_for_folium, mercator_bbox
+    # Return the center/bounds for folium
+    return center, bounds_for_folium, mercator_bbox
 
 # Function to reclassify -> colorfy -> reproject -> toPNG
-def process_raster(initial_tif:str=None, 
+def process_int_raster(initial_tif:str=None, 
                    band=1, 
                    reclass_dict:dict=None, 
                    color_dict:dict=None,
@@ -253,12 +253,12 @@ def process_raster(initial_tif:str=None,
             Destination coordinate reference system (default is 'EPSG:4326').
     """
     # Process the raster entirely in memory
-    memfile_reclassified = reclassify_raster_in_memory(initial_tif, reclass_dict, band)
-    memfile_colored = convert_1band_to_4band_in_memory(memfile_reclassified, color_dict, binary_color, binary_dict)
-    memfile_reprojected = reproject_raster_in_memory(memfile_colored)
+    f = reclassify_raster_in_memory(initial_tif, reclass_dict, band)
+    f = convert_1band_to_4band_in_memory(f, color_dict, binary_color, binary_dict)
+    f = reproject_raster_in_memory(f)
     
     # Save the reprojected raster as a GeoTIFF file
-    with memfile_reprojected.open() as src:
+    with f.open() as src:
         kwargs = src.meta.copy()
         kwargs.update(compress='lzw', dtype='uint8', nodata=None)
         with rasterio.open(f"{final_path}_mercator.tif", 'w', **kwargs) as dst:
@@ -266,10 +266,161 @@ def process_raster(initial_tif:str=None,
                 dst.write(src.read(i), i)
     
     # Save the reprojected raster as a PNG file
-    center, bounds_for_folium, mercator_bbox = save_colored_raster_as_png(memfile_reprojected, 
-                                                                          f"{final_path}_mercator.png", 
-                                                                          src_crs, 
-                                                                          dst_crs)
+    center, bounds_for_folium, mercator_bbox = save_colored_raster_as_png(f, 
+                                                    f"{final_path}_mercator.png", 
+                                                    src_crs, 
+                                                    dst_crs)
     
+    # Return the center and bounds for folium
+    return center, bounds_for_folium, mercator_bbox
+
+
+
+
+###################################################################
+#                       Process float image                       #
+###################################################################
+
+def get_color_dict(color_scheme:str='YlOrRd'):
+    """
+    Returns a dictionary mapping values to colors based on the specified color scheme.
+
+    Parameters:
+    - color_scheme (str): The name of the color scheme to use. Default is 'YlOrRd'.
+
+    Returns:
+    - dict: A dictionary mapping values to colors.
+    """
+    colors = mpl.colormaps[color_scheme]
+    val_colors_dict = {i: colors(i/100) for i in range(101)}
+    var_colors_dict = {k:tuple(int(num*255) for num in v) for k,v in val_colors_dict.items()}
+    var_colors_dict[-100] = (225, 225, 225, 255) # Add the Non-Agricultural color
+
+    return var_colors_dict
+
+
+import rasterio
+import numpy as np
+from rasterio.io import MemoryFile
+
+def float_img_to_int(tif_path: str, 
+                    band: int = 1):
+    """
+    Converts a floating-point image to an integer image.
+
+    Args:
+        tif_path (str): The path to the input TIFF file.
+        band (int, optional): The band number to read from the TIFF file. Defaults to 1.
+
+    Returns:
+        MemoryFile: The in-memory file containing the converted integer image.
+    """
+    with rasterio.open(tif_path) as src:
+        src_arr = src.read(band)
+        src_arr = (src_arr * 100).astype(np.int16)
+        
+        meta = src.meta.copy()
+        meta.update(compress='lzw')
+
+        # Create an in-memory file
+        memfile = MemoryFile()
+        with memfile.open(**meta) as dst:
+            dst.write(src_arr, band)
+            
+        return memfile
+    
+
+def mask_invalid_data(memfile: MemoryFile, 
+                      mask_path: str):
+    """
+    Masks the invalid data in the input memory file using the provided mask.
+
+    Args:
+        memfile (MemoryFile): The input memory file containing the data to be masked.
+        mask_path (str): The path to the mask file.
+
+    Returns:
+        MemoryFile: The memory file with the invalid data masked.
+    """
+
+    with rasterio.open(mask_path) as mask, memfile.open() as src:
+        
+        
+        mask_arr = mask.read(1)
+        mask_arr = mask_arr.astype(np.int16)
+        
+        # read the 4-band array
+        out_arr = src.read() # CHW
+        out_arr = out_arr.transpose(1, 2, 0) # CHW -> HWC
+        
+        # Mask the invalid data
+        out_arr[mask_arr == -9999] = (0, 0, 0, 0)
+        out_arr = out_arr.transpose(2, 0, 1) # HWC -> CHW
+        
+        meta = src.meta.copy()
+        meta.update(compress='lzw', dtype=np.uint8, count=out_arr.shape[0])
+        
+    # Create a new in-memory file for the 4-band array
+    memfile = MemoryFile()
+    with memfile.open(**meta) as dst:
+        dst.write(out_arr)
+        
+    return memfile
+
+
+
+# Function to intify -> colorfy -> reproject -> toPNG
+def process_float_raster(initial_tif:str=None, 
+                   band:int=1,
+                   color_dict:dict=None,
+                   mask_path:str=None, 
+                   final_path:str=None,
+                   src_crs='EPSG:3857', 
+                   dst_crs='EPSG:4326'):
+    """
+    Process a float raster image by converting it to an integer, 
+    converting it to a 4-band image, masking invalid data, and 
+    reprojecting it. Save the reprojected raster as a GeoTIFF file 
+    and a PNG file. Return the center and bounds for folium.
+
+    Parameters:
+    initial_tif (str): 
+            Path to the initial float raster image.
+    band (int, default=1): 
+            Band number of the float raster image.
+    color_dict (dict): 
+            Dictionary mapping values to colors for the 4-band image.
+    mask_path (str): 
+            Path to the mask file for invalid data.
+    final_path (str): 
+            Path to save the final raster files.
+    src_crs (str, default='EPSG:3857'): 
+            Source CRS (Coordinate Reference System) of the raster image.
+    dst_crs (str, default='EPSG:4326'): 
+            Destination CRS for reprojecting the raster image.
+
+    Returns:
+    tuple: A tuple containing the center coordinates, bounds for folium, and the mercator bounding box.
+    """
+    
+    f = float_img_to_int(initial_tif,band)
+    f = convert_1band_to_4band_in_memory(f,color_dict)
+    f = mask_invalid_data(f, mask_path)
+    f = reproject_raster_in_memory(f)
+
+    # Save the reprojected raster as a GeoTIFF file
+    with f.open() as src:
+        kwargs = src.meta.copy()
+        kwargs.update(compress='lzw', dtype='uint8', nodata=None)
+        with rasterio.open(f"{final_path}_mercator.tif", 'w', **kwargs) as dst:
+            for i in range(1, src.count + 1):
+                dst.write(src.read(i), i)
+
+    # Save the reprojected raster as a PNG file
+    center, bounds_for_folium, mercator_bbox = save_colored_raster_as_png(f, 
+                                                    f"{final_path}_mercator.png", 
+                                                    src_crs, 
+                                                    dst_crs)
+
     # Return the center and bounds for folium
     return center, bounds_for_folium, mercator_bbox
