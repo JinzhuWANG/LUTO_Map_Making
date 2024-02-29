@@ -180,7 +180,7 @@ def save_colored_raster_as_png(src_memfile: MemoryFile,
 # Function to reclassify -> colorfy -> reproject -> toPNG
 def process_int_raster(initial_tif:str=None, 
                    band=1,
-                   map_type_idx:str=None, 
+                   map_type_idx:int=None, 
                    color_dict:dict=None,
                    src_crs='EPSG:3857', 
                    dst_crs='EPSG:4326'):
@@ -192,10 +192,17 @@ def process_int_raster(initial_tif:str=None,
             Path to the initial raster file.
         band (int): 
             Band number to process (default is 1).
+        map_type_idx (int):
+            Index of the map type (default is None).
         color_dict (dict): 
+            Dictionary mapping pixel values to colors (default is None).
+        src_crs (str):
             Source coordinate reference system (default is 'EPSG:3857').
         dst_crs (str):
             Destination coordinate reference system (default is 'EPSG:4326').
+    
+    Returns:
+        tuple: A tuple containing the center, bounds for folium, and mercator bounding box.
     """
     # Process the raster entirely in memory
     f = convert_1band_to_4band_in_memory(initial_tif, band, color_dict)
@@ -310,19 +317,17 @@ def process_float_raster(initial_tif:str=None,
 
     Parameters:
     initial_tif (str): 
-            Path to the initial float raster image.
+        Path to the initial float raster image.
     band (int, default=1): 
-            Band number of the float raster image.
+        Band number of the float raster image.
     color_dict (dict): 
-            Dictionary mapping values to colors for the 4-band image.
+        Dictionary mapping values to colors for the 4-band image.
     mask_path (str): 
-            Path to the mask file for invalid data.
-    final_path (str): 
-            Path to save the final raster files.
+        Path to the mask file for invalid data.
     src_crs (str, default='EPSG:3857'): 
-            Source CRS (Coordinate Reference System) of the raster image.
+        Source CRS (Coordinate Reference System) of the raster image.
     dst_crs (str, default='EPSG:4326'): 
-            Destination CRS for reprojecting the raster image.
+        Destination CRS for reprojecting the raster image.
 
     Returns:
     tuple: A tuple containing the center coordinates, bounds for folium, and the mercator bounding box.

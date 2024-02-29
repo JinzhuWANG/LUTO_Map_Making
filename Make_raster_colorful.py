@@ -19,6 +19,8 @@ from map_tools.helper import get_map_meta
 ###################################################################
 
 init_tif = 'Rasters/lumap_2050_2024_02_17__21_20_52.tiff'
+tif_path = 'Rasters/lucc_separate/Non-Ag_LU_00_Environmental Plantings_2050.tiff'
+NLUM_mask = 'Assests/NLUM_2010-11_mask.tif'
 
 # Get the metadata for map making
 map_meta = get_map_meta()
@@ -32,6 +34,7 @@ legend_position = map_meta['legend_position']
 ###################################################################
 #           Get reclassification and color dictionary             #
 ###################################################################
+
 
 
 for idx, row in map_meta.iterrows():
@@ -65,24 +68,17 @@ for idx, row in map_meta.iterrows():
         # center -> the center of the raster, can be used for folium map
         # bounds_wgs -> the bounds of the raster in WGS84, can be used for folium map
         # bounds_mercator -> the bounds of the raster in Mercator, can be to download the basemap
-        center,  bounds_wgs, bounds_mercator = process_int_raster(initial_tif=init_tif, 
-                                                                color_dict=val_color_dict,
-                                                                map_type_idx=idx)
+        
+        if data_type == 'integer':
+            center,  bounds_wgs, bounds_mercator = process_int_raster(initial_tif=init_tif, 
+                                                                    color_dict=val_color_dict,
+                                                                    map_type_idx=idx)
 
 
-
-
-
-
-
-tif_path = 'Rasters/lucc_separate/Non-Ag_LU_00_Environmental Plantings_2050.tiff'
-NLUM_mask = 'Assests/NLUM_2010-11_mask.tif'
-
-
-center, bounds_for_folium, mercator_bbox = process_float_raster(
-                                                initial_tif=tif_path,
-                                                color_dict=var_colors_dict,
-                                                mask_path=NLUM_mask)
+        elif data_type == 'float':
+            center, bounds_for_folium, mercator_bbox = process_float_raster(
+                                                            initial_tif=tif_path,
+                                                            mask_path=NLUM_mask)
 
 
 
