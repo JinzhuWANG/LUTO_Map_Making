@@ -1,34 +1,34 @@
-lu_code,lu_desc,lu_color_HEX,group_code,group_desc,group_color_HEX
--1,Non-agricultural land,#666b65,-1,Non-Agricultural Land,#e1e1e1
--2,"Water Bodies, cites etc.",#ffffff,-1,Non-Agricultural Land,#e1e1e1
-0,Apples,#a63634,1,Crop,#7a8ef5
-3,Citrus,#e79029,1,Crop,#7a8ef5
-4,Cotton,#c3cada,1,Crop,#7a8ef5
-7,Grapes,#7298c7,1,Crop,#7a8ef5
-8,Hay,#c47646,1,Crop,#7a8ef5
-9,Nuts,#6f4328,1,Crop,#7a8ef5
-10,Other non-cereal crops,#bf8d7e,1,Crop,#7a8ef5
-11,Pears,#ad5d44,1,Crop,#7a8ef5
-12,Plantation fruit,#a76d5f,1,Crop,#7a8ef5
-13,Rice,#7f7969,1,Crop,#7a8ef5
-16,Stone fruit,#704228,1,Crop,#7a8ef5
-17,Sugar,#bc8463,1,Crop,#7a8ef5
-18,Summer cereals,#dedfb7,1,Crop,#7a8ef5
-19,Summer legumes,#757448,1,Crop,#7a8ef5
-20,Summer oilseeds,#d8b6b4,1,Crop,#7a8ef5
-21,Tropical stone fruit,#408dd5,1,Crop,#7a8ef5
-24,Vegetables,#a88571,1,Crop,#7a8ef5
-25,Winter cereals,#fcb819,1,Crop,#7a8ef5
-26,Winter legumes,#49482a,1,Crop,#7a8ef5
-27,Winter oilseeds,#d6a193,1,Crop,#7a8ef5
-1,Beef - modified land,#b09c83,2,Livestock,#ffa77f
-2,Beef - natural land,#d4bea6,2,Livestock,#ffa77f
-5,Dairy - modified land,#9c9d13,2,Livestock,#ffa77f
-6,Dairy - natural land,#beb678,2,Livestock,#ffa77f
-14,Sheep - modified land,#f0c662,2,Livestock,#ffa77f
-15,Sheep - natural land,#e2bd76,2,Livestock,#ffa77f
-22,Unallocated - modified land,#000000,3,Unallocated - modified land,#00e6a9
-23,Unallocated - natural land,#c8d3db,4,Unallocated - natural land,#ffebbe
-100,Environmental Planting,#007a53,5,Environmental Planting,#267300
-101,Environmental Planting,#007a53,5,Environmental Planting,#267300
-102,Environmental Planting,#007a53,5,Environmental Planting,#267300
+lu_code,lu_desc,lu_color_HEX
+-1,Non-agricultural land,#666b65
+-2,"Water Bodies, cites etc.",#ffffff
+0,Apples,#a63634
+3,Citrus,#e79029
+4,Cotton,#c3cada
+7,Grapes,#7298c7
+8,Hay,#c47646
+9,Nuts,#6f4328
+10,Other non-cereal crops,#bf8d7e
+11,Pears,#ad5d44
+12,Plantation fruit,#a76d5f
+13,Rice,#7f7969
+16,Stone fruit,#704228
+17,Sugar,#bc8463
+18,Summer cereals,#dedfb7
+19,Summer legumes,#757448
+20,Summer oilseeds,#d8b6b4
+21,Tropical stone fruit,#408dd5
+24,Vegetables,#a88571
+25,Winter cereals,#fcb819
+26,Winter legumes,#49482a
+27,Winter oilseeds,#d6a193
+1,Beef - modified land,#b09c83
+2,Beef - natural land,#d4bea6
+5,Dairy - modified land,#9c9d13
+6,Dairy - natural land,#beb678
+14,Sheep - modified land,#f0c662
+15,Sheep - natural land,#e2bd76
+22,Unallocated - modified land,#000000
+23,Unallocated - natural land,#c8d3db
+100,Environmental Planting,#007a53
+101,Environmental Planting,#007a53
+102,Environmental Planting,#007a53

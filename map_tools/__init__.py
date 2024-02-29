@@ -1,6 +1,6 @@
+import os
 import numpy as np
 import imageio
-import matplotlib as mpl
 
 import rasterio
 from rasterio.io import MemoryFile
@@ -53,64 +53,23 @@ def hex_color_to_numeric(hex_color: str, toFloat: bool = False) -> tuple:
     
 
 
-
-def reclassify_raster_in_memory(src_path: str, 
-                                reclass_dict: dict, 
-                                band: int = 1) -> MemoryFile:
-    """
-    Reclassify a raster and return a MemoryFile.
-
-    Parameters:
-    src_path (str): 
-        The path to the source raster dataset.
-    reclass_dict (dict): 
-        A dictionary mapping original values to reclassified values.
-    band (int, optional): 
-        The band index to read from the source raster. Default is 1.
-
-    Returns:
-        MemoryFile: The reclassified raster as a MemoryFile object.
-    """
-    with rasterio.open(src_path) as src:
-        lu_arr = src.read(band)
-        lu_meta = src.meta.copy()
-        lu_meta.update(count=1, compress='lzw', dtype='int8', nodata=-128)
-        
-        for k, v in reclass_dict.items():
-            lu_arr[lu_arr == k] = v
-
-        # Create an in-memory file
-        memfile = MemoryFile()
-        with memfile.open(**lu_meta) as dst:
-            dst.write(lu_arr, band)
-
-    return memfile
-
-
-def convert_1band_to_4band_in_memory(src_memfile: MemoryFile, 
-                                     color_dict: dict, 
-                                     binary_color: bool = False, 
-                                     binary_dict: dict = None) -> MemoryFile:
+def convert_1band_to_4band_in_memory(initial_tif:str,
+                                     band:int=1, 
+                                     color_dict: dict=None) -> MemoryFile:
     """Convert a 1-band array in a MemoryFile to 4-band (RGBA) and return a new MemoryFile.
 
     Args:
-        src_memfile (MemoryFile): 
-                The input MemoryFile containing the 1-band array.
+        initial_tif (str): 
+                The path for input tif.
         color_dict (dict): 
                 A dictionary of color values for each class.
-        binary_color (bool, optional): 
-                If True, use the binary_dict to colorfy the raster. Defaults to False.
-        binary_dict (dict, optional): 
-                A dictionary of color values for binary classes. Only provided if binary_color is True.
 
     Returns:
         MemoryFile: The new MemoryFile containing the 4-band (RGBA) array.
     """
-    if binary_color:
-        color_dict = binary_dict
     
-    with src_memfile.open() as src:
-        lu_arr = src.read(1)    # Read the 1-band array, return a 2D array (HW)
+    with rasterio.open(initial_tif) as src:
+        lu_arr = src.read(band)               # Read the 1-band array, return a 2D array (HW)
         nodata = src.meta['nodata']
         color_dict[nodata] = (0, 0, 0, 0)  # Set the color of nodata value to transparent
         
@@ -212,8 +171,7 @@ def save_colored_raster_as_png(src_memfile: MemoryFile,
         # Get the center of the bounding box
         center = [(wgs84_bbox.bottom + wgs84_bbox.top) / 2,
                   (wgs84_bbox.left + wgs84_bbox.right) / 2]
-
-        # Save the image to a file
+        
         imageio.imsave(out_path, img_rgba)
         
     # Return the center/bounds for folium
@@ -221,12 +179,9 @@ def save_colored_raster_as_png(src_memfile: MemoryFile,
 
 # Function to reclassify -> colorfy -> reproject -> toPNG
 def process_int_raster(initial_tif:str=None, 
-                   band=1, 
-                   reclass_dict:dict=None, 
+                   band=1,
+                   map_type_idx:str=None, 
                    color_dict:dict=None,
-                   binary_color:bool=False,
-                   binary_dict:dict=None, 
-                   final_path:str=None,
                    src_crs='EPSG:3857', 
                    dst_crs='EPSG:4326'):
     """
@@ -237,37 +192,29 @@ def process_int_raster(initial_tif:str=None,
             Path to the initial raster file.
         band (int): 
             Band number to process (default is 1).
-        reclass_dict (dict): 
-            Dictionary mapping original pixel values to new values for reclassification (default is None).
         color_dict (dict): 
-            Dictionary mapping pixel values to RGB color values for coloring (default is None).
-        binary_color (bool):
-            Flag indicating whether to use binary color mapping (default is False).
-        binary_dict (dict):
-            Dictionary mapping pixel values to binary values for binary color mapping (default is None).
-        final_path (str): 
-            Path to save the final processed raster file (default is None).
-        src_crs (str):
             Source coordinate reference system (default is 'EPSG:3857').
         dst_crs (str):
             Destination coordinate reference system (default is 'EPSG:4326').
     """
     # Process the raster entirely in memory
-    f = reclassify_raster_in_memory(initial_tif, reclass_dict, band)
-    f = convert_1band_to_4band_in_memory(f, color_dict, binary_color, binary_dict)
+    f = convert_1band_to_4band_in_memory(initial_tif, band, color_dict)
     f = reproject_raster_in_memory(f)
     
+    # Infer the save path (no extension) from the initial path
+    save_base = os.path.splitext(initial_tif)[0]
+        
     # Save the reprojected raster as a GeoTIFF file
     with f.open() as src:
         kwargs = src.meta.copy()
         kwargs.update(compress='lzw', dtype='uint8', nodata=None)
-        with rasterio.open(f"{final_path}_mercator.tif", 'w', **kwargs) as dst:
+        with rasterio.open(f"{save_base}_mercator_{map_type_idx}.tif", 'w', **kwargs) as dst:
             for i in range(1, src.count + 1):
                 dst.write(src.read(i), i)
     
     # Save the reprojected raster as a PNG file
     center, bounds_for_folium, mercator_bbox = save_colored_raster_as_png(f, 
-                                                    f"{final_path}_mercator.png", 
+                                                    f"{save_base}_mercator_{map_type_idx}.png", 
                                                     src_crs, 
                                                     dst_crs)
     
@@ -281,27 +228,6 @@ def process_int_raster(initial_tif:str=None,
 #                       Process float image                       #
 ###################################################################
 
-def get_color_dict(color_scheme:str='YlOrRd'):
-    """
-    Returns a dictionary mapping values to colors based on the specified color scheme.
-
-    Parameters:
-    - color_scheme (str): The name of the color scheme to use. Default is 'YlOrRd'.
-
-    Returns:
-    - dict: A dictionary mapping values to colors.
-    """
-    colors = mpl.colormaps[color_scheme]
-    val_colors_dict = {i: colors(i/100) for i in range(101)}
-    var_colors_dict = {k:tuple(int(num*255) for num in v) for k,v in val_colors_dict.items()}
-    var_colors_dict[-100] = (225, 225, 225, 255) # Add the Non-Agricultural color
-
-    return var_colors_dict
-
-
-import rasterio
-import numpy as np
-from rasterio.io import MemoryFile
 
 def float_img_to_int(tif_path: str, 
                     band: int = 1):
@@ -374,7 +300,6 @@ def process_float_raster(initial_tif:str=None,
                    band:int=1,
                    color_dict:dict=None,
                    mask_path:str=None, 
-                   final_path:str=None,
                    src_crs='EPSG:3857', 
                    dst_crs='EPSG:4326'):
     """
@@ -407,18 +332,21 @@ def process_float_raster(initial_tif:str=None,
     f = convert_1band_to_4band_in_memory(f,color_dict)
     f = mask_invalid_data(f, mask_path)
     f = reproject_raster_in_memory(f)
+    
+    # Infer the save path (no extension) from the initial path
+    save_base = os.path.splitext(initial_tif)[0]
 
     # Save the reprojected raster as a GeoTIFF file
     with f.open() as src:
         kwargs = src.meta.copy()
         kwargs.update(compress='lzw', dtype='uint8', nodata=None)
-        with rasterio.open(f"{final_path}_mercator.tif", 'w', **kwargs) as dst:
+        with rasterio.open(f"{save_base}_mercator.tif", 'w', **kwargs) as dst:
             for i in range(1, src.count + 1):
                 dst.write(src.read(i), i)
 
     # Save the reprojected raster as a PNG file
     center, bounds_for_folium, mercator_bbox = save_colored_raster_as_png(f, 
-                                                    f"{final_path}_mercator.png", 
+                                                    f"{save_base}_mercator.png", 
                                                     src_crs, 
                                                     dst_crs)
 
